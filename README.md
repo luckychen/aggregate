@@ -1,4 +1,4 @@
-#The aggregate code for sequence data
+## The aggregate code for sequence data
 
 This is the primary version of aggregate project
 
