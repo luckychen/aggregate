@@ -19,7 +19,7 @@ inline string extractSeq(string data){
 	unsigned int firstL = data.find_first_not_of(' ');
 	auto trimed = data.substr(firstL, data.size());
 	unsigned int splitPo = min(trimed.find_first_of('\t'), trimed.find_first_of(' ')); 
-	return trimed.substr(0, splitPo - 1);
+	return trimed.substr(0, splitPo);
 }
 
 
@@ -44,7 +44,7 @@ class aggregatedData{
 			string line;
 			ifstream sampleRead;
 			//read the file and put every unique seq into a map
-			sampleRead.open("../all_sample.reads");
+			sampleRead.open(fileName);
 			getline(sampleRead, inputFileHead);//head line
 			while(getline(sampleRead, line)){
 				dataLine++;
