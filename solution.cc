@@ -12,8 +12,20 @@ using namespace std;
 
 typedef struct _node{
 	unsigned int groupID;
-	vector<string> data;
+	list<string> data;
+	unsigned int readCount;
+	string verifyString;
 }node;
+
+typedef struct _mapS{
+	unsigned int groupID;
+	unsigned int readCount;
+	bool operator<(const _mapS &rhs) const { return readCount< rhs.readCount; }
+	bool operator>(const _mapS &rhs) const { return readCount> rhs.readCount; }
+	bool operator==(const _mapS &rhs) const { return readCount== rhs.readCount; }
+}mapS;
+
+
 
 inline string extractSeq(string data){
 	unsigned int firstL = data.find_first_not_of(' ');
@@ -22,11 +34,26 @@ inline string extractSeq(string data){
 	return trimed.substr(0, splitPo);
 }
 
+inline string extractCount(string data){
+	unsigned int firstL = data.find_first_not_of(' ');
+	auto trimed = data.substr(firstL, data.size());
+	unsigned int splitPo;
+	unsigned int i = 0;
+	while(i < 3){
+		splitPo = min(trimed.find_first_of('\t'), trimed.find_first_of(' ')); 
+		trimed = trimed.substr(splitPo + 1, trimed.size());
+		i++;
+	}
+	splitPo = min(trimed.find_first_of('\t'), trimed.find_first_of(' ')); 
+	return trimed.substr(0, splitPo);
+}
+
 
 class aggregatedData{
 	private:
 		unsigned int globalGroupCount;
 		unsigned int dataLine;
+		bool V;
 		string fileName; 
 		string inputFileHead;
 		map<string, node*> originData;
@@ -38,7 +65,7 @@ class aggregatedData{
 		void buildHalfMap();
 		bool oneCharDiff(string &S1, string &S2);
 	public:
-		aggregatedData(string fileName_):fileName(fileName_){
+		aggregatedData(string fileName_, bool V_):fileName(fileName_), V(V_){
 			globalGroupCount = 0;
 			dataLine = 0;
 			string line;
@@ -54,12 +81,14 @@ class aggregatedData{
 					if(originData[seq]->groupID == 0){
 						globalGroupCount += 1;
 						originData[seq]->groupID = globalGroupCount;
+						originData[seq]->readCount += atoi(extractCount(line).c_str()); 
 					}
 					originData[seq]->data.push_back(line);
 				} else {
 					auto temp = new node;
 					temp->groupID = 0;
 					temp->data.push_back(line);
+					temp->readCount = atoi(extractCount(line).c_str());
 					originData[seq] = temp;	
 				}
 			}		
@@ -68,6 +97,7 @@ class aggregatedData{
 		}
 		void writeResult(string file);
 		void arrangeGroupId();
+		void sortedInsert(list<node*>& listToUpdate, node* inputNode);
 		~aggregatedData(){
 			for(auto const &i : originData){
 				delete(i.second);//all data nodes were deleted
@@ -82,6 +112,19 @@ class aggregatedData{
 
 };
 
+void aggregatedData::sortedInsert(list<node*>& listToUpdate, node* inputNode){
+	list<node*>::iterator it;
+	if(listToUpdate.size() == 0){
+		listToUpdate.push_back(inputNode);
+	} else {
+		for(it=listToUpdate.begin(); it!=listToUpdate.end(); ++it){
+			if(inputNode->readCount >= (*it)->readCount){
+				listToUpdate.insert(it, inputNode);	
+				break;
+			}
+		}
+	}
+}
 vector<string> aggregatedData::splitHalf(const string &input){
 	vector<string> result(2);
 	result[0] = input.substr(0, input.size()/2);
@@ -132,9 +175,17 @@ void aggregatedData::arrangeGroupId(){
 					} else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
 						globalGroupCount += 1;
 						originData[hitKey]->groupID =  originData[origKey]->groupID = globalGroupCount;
+						originData[origKey]->verifyString = hitKey;
+						originData[hitKey]->verifyString = origKey;
 					} else {
-						originData[hitKey]->groupID == 0 ? originData[hitKey]->groupID = originData[origKey]->groupID 
-							: originData[origKey]->groupID = originData[hitKey]->groupID;
+						if(originData[hitKey]->groupID == 0 )
+						{	
+							originData[hitKey]->groupID = originData[origKey]->groupID ;
+							originData[hitKey]->verifyString = origKey;
+						} else {
+							originData[origKey]->groupID = originData[hitKey]->groupID;
+							originData[origKey]->verifyString = hitKey;
+						}
 					}
 				} 
 			}		
@@ -149,14 +200,22 @@ void aggregatedData::arrangeGroupId(){
 					}else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
 						globalGroupCount += 1;
 						originData[hitKey]->groupID = originData[origKey]->groupID = globalGroupCount;
+						originData[origKey]->verifyString = hitKey;
+						originData[hitKey]->verifyString = origKey;
 					} else {
-						originData[hitKey]->groupID == 0 ? originData[hitKey]->groupID = originData[origKey]->groupID 
-							: originData[origKey]->groupID = originData[hitKey]->groupID;
+						if(originData[hitKey]->groupID == 0 )
+						{	   
+							originData[hitKey]->groupID = originData[origKey]->groupID;
+							originData[hitKey]->verifyString = origKey;
+						} else {
+							originData[origKey]->groupID = originData[hitKey]->groupID;
+							originData[origKey]->verifyString = hitKey;
+						}
 					}
 				} 
 			}
 		}
-		auto tempKey = origKey.substr(1, origKey.size() - 1); 
+		auto tempKey = origKey.substr(1, origKey.size()); 
 		auto it3 = originData.find(tempKey);
 		if(it3 != originData.end()){
 			if(it3->second->groupID != 0 && origIt.second->groupID != 0){
@@ -164,9 +223,18 @@ void aggregatedData::arrangeGroupId(){
 			}else if(it3->second->groupID == 0 && origIt.second->groupID == 0){
 				globalGroupCount += 1;
 				originData[tempKey]->groupID = originData[origKey]->groupID = globalGroupCount;
+				originData[origKey]->verifyString = tempKey;
+				originData[tempKey]->verifyString = origKey;
 			} else {
-				originData[tempKey]->groupID == 0 ? originData[tempKey]->groupID = originData[origKey]->groupID 
-					: originData[origKey]->groupID = originData[tempKey]->groupID;
+				if(originData[tempKey]->groupID == 0)  
+				{
+					originData[tempKey]->groupID = originData[origKey]->groupID; 
+					originData[tempKey]->verifyString = origKey;
+				} else {
+					originData[origKey]->groupID = originData[tempKey]->groupID; 
+					originData[origKey]->verifyString = tempKey;
+				}
+				
 			}
 		}
 		
@@ -178,9 +246,17 @@ void aggregatedData::arrangeGroupId(){
 			} else if(it4->second->groupID == 0 && origIt.second->groupID == 0){
 				globalGroupCount += 1;
 				originData[tempKey]->groupID = originData[origKey]->groupID = globalGroupCount;
+				originData[origKey]->verifyString = tempKey;
+				originData[tempKey]->verifyString = origKey;
 			} else {
-				originData[tempKey]->groupID == 0 ? originData[tempKey]->groupID = originData[origKey]->groupID 
-					: originData[origKey]->groupID = originData[tempKey]->groupID;
+				if(originData[tempKey]->groupID == 0)  
+				{
+					originData[tempKey]->groupID = originData[origKey]->groupID;
+					originData[tempKey]->verifyString = origKey;
+				} else {
+					originData[origKey]->groupID = originData[tempKey]->groupID;
+					originData[origKey]->verifyString = tempKey;
+				}		 
 			}
 		}
 
@@ -206,21 +282,42 @@ bool aggregatedData::oneCharDiff(string& s1, string& s2){
 	return false;
 }
 void aggregatedData::writeResult(string outFileName){
-	vector<vector<node*>> groupIdVec;
+	vector<list<node*>> groupIdVec;
+	vector<list<node*>> groupIdVec_2;
+	vector<mapS> mapSVec;
+	vector<unsigned int> mapIntVec;
+	mapSVec.resize(globalGroupCount+1);
+	mapIntVec.resize(globalGroupCount+1);
+	groupIdVec_2.resize(globalGroupCount+1);
+	
 	for(unsigned int i = 0; i <= globalGroupCount; ++i){
 		groupIdVec.push_back({});
+		mapSVec[i].groupID = i;
 	}	
 	ofstream ofs(outFileName, ofstream::out);
 	for(auto &it : originData){
 		if(it.second->groupID != 0){
-			groupIdVec[(it.second)->groupID].push_back(it.second);	
+			mapSVec[(it.second)->groupID].readCount += (it.second)->readCount;
+			sortedInsert(groupIdVec[(it.second)->groupID], it.second);
 		}
 	}
+	sort(mapSVec.begin(), mapSVec.end(), greater<mapS>());
+
+	for(unsigned int i = 0; i <= globalGroupCount; ++i){
+		mapIntVec[mapSVec[i].groupID] = i;
+	}
+	for(unsigned int id = 0; id <= globalGroupCount; ++id){
+		groupIdVec_2[mapIntVec[id]] = groupIdVec[id];
+	}
+	
 	ofs << "groupID\t" + inputFileHead << endl;
 	for(unsigned int i = 0; i < groupIdVec.size(); ++i){
-		for(auto &it : groupIdVec[i]){
-			for(unsigned int j = 0; j < it->data.size(); ++j){
-				ofs<<to_string(i) + '\t' + it->data[j] << endl;
+		for(auto &it : groupIdVec_2[i]){
+			for(auto &it_j : it->data){
+				if(V)
+					ofs<<to_string(i) + '\t' + it->verifyString + '\t' + it_j << endl;
+				else
+					ofs<<to_string(i) + '\t' + it_j << endl;
 			}
 		}
 	}
@@ -237,7 +334,8 @@ int main(int argc, char* argv[]) {
 	char fileName[100];
 	char resultName[100];
 	int oc;
-	while ((oc = getopt(argc, argv, "i:o:")) != -1) {	
+	bool V = false;//verify
+	while ((oc = getopt(argc, argv, "i:o:v:")) != -1) {	
 
 		switch (oc) {
 			case 'i':
@@ -248,6 +346,12 @@ int main(int argc, char* argv[]) {
 				/* output result file name */
 				sprintf(resultName, "%s", optarg);
 				break;
+			case 'v':
+				/* verification  */
+				if(atoi(optarg) == 1)
+					V = true;	
+				break;
+
 			case ':':
 				printf("missing arguments\n");
 				exit(0);
@@ -267,7 +371,7 @@ int main(int argc, char* argv[]) {
 		exit(0);
 	}
 
-	class aggregatedData aggregatedData_(fileName);
+	class aggregatedData aggregatedData_(fileName, V);
 	aggregatedData_.arrangeGroupId();	
 	aggregatedData_.writeResult(resultName);
 
