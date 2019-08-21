@@ -39,7 +39,7 @@ inline string extractCount(string data){
 	auto trimed = data.substr(firstL, data.size());
 	unsigned int splitPo;
 	unsigned int i = 0;
-	while(i < 3){
+	while(i < 4){
 		splitPo = min(trimed.find_first_of('\t'), trimed.find_first_of(' ')); 
 		trimed = trimed.substr(splitPo + 1, trimed.size());
 		i++;
@@ -123,6 +123,8 @@ void aggregatedData::sortedInsert(list<node*>& listToUpdate, node* inputNode){
 				break;
 			}
 		}
+		if(it == listToUpdate.end())
+			listToUpdate.push_back(inputNode);
 	}
 }
 vector<string> aggregatedData::splitHalf(const string &input){
@@ -298,15 +300,19 @@ void aggregatedData::writeResult(string outFileName){
 	for(auto &it : originData){
 		if(it.second->groupID != 0){
 			mapSVec[(it.second)->groupID].readCount += (it.second)->readCount;
+			//groupIdVec[(it.second)->groupID].push_back(it.second);
 			sortedInsert(groupIdVec[(it.second)->groupID], it.second);
+		} else {
+			groupIdVec[0].push_back(it.second);	
 		}
+		
 	}
 	sort(mapSVec.begin(), mapSVec.end(), greater<mapS>());
 
 	for(unsigned int i = 0; i <= globalGroupCount; ++i){
 		mapIntVec[mapSVec[i].groupID] = i;
 	}
-	for(unsigned int id = 0; id <= globalGroupCount; ++id){
+	for(unsigned int id = 1; id <= globalGroupCount; ++id){
 		groupIdVec_2[mapIntVec[id]] = groupIdVec[id];
 	}
 	
@@ -315,11 +321,16 @@ void aggregatedData::writeResult(string outFileName){
 		for(auto &it : groupIdVec_2[i]){
 			for(auto &it_j : it->data){
 				if(V)
-					ofs<<to_string(i) + '\t' + it->verifyString + '\t' + it_j << endl;
+					ofs<<to_string(i + 1) + '\t' + it->verifyString + '\t' + it_j << endl;
 				else
-					ofs<<to_string(i) + '\t' + it_j << endl;
+					ofs<<to_string(i + 1) + '\t' + it_j << endl;
 			}
 		}
+	}
+	unsigned int appendId = globalGroupCount;
+	for(auto &it : groupIdVec[0]){
+		ofs<<to_string(appendId + 1) + '\t' + it->data.front() << endl;	
+		appendId += 1;
 	}
 	ofs.close();
 }
