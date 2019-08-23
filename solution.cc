@@ -17,6 +17,9 @@ typedef struct _node{
 	string verifyString;
 }node;
 
+inline bool nodeGreater (node* node1, node* node2)
+{ return ( node1->readCount>=node2->readCount )};
+
 typedef struct _mapS{
 	unsigned int groupID;
 	unsigned int readCount;
@@ -62,6 +65,7 @@ class aggregatedData{
 		map<string, node*> firstHalfMap;
 		vector<string> *aggregatedVec;
 		vector<string> splitHalf(const string &input);
+		vector<list<node*>> groupIdVec;
 		void buildHalfMap();
 		bool oneCharDiff(string &S1, string &S2);
 	public:
@@ -127,6 +131,20 @@ void aggregatedData::sortedInsert(list<node*>& listToUpdate, node* inputNode){
 			listToUpdate.push_back(inputNode);
 	}
 }
+
+void aggregatedData::moveIdVecElement(unsigned int id1, unsigned int id2){
+	
+	if(groupIdVec[id1].size() == 0 || groupIdVec[id2].size() == 0){
+		cout<<"error at list insert"<<endl;
+		exit(0);
+	} 
+	for(auto it : groupIdVec[id2]){
+		it->groupID = groupIdVec[id1].front()->groupID;
+	}
+	groupIdVec[id1].merge(groupIdVec[id2], nodeGreater);
+	groupIdV
+}
+
 vector<string> aggregatedData::splitHalf(const string &input){
 	vector<string> result(2);
 	result[0] = input.substr(0, input.size()/2);
@@ -172,21 +190,40 @@ void aggregatedData::arrangeGroupId(){
 				if(oneCharDiff(secondHalfKey, hitString) == true){
 					string hitKey = firstHalfKey;	
 					hitKey.append(hitString);
-					if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
+					if(hitKey > origKey)
 						continue;
-					} else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
-						globalGroupCount += 1;
-						originData[hitKey]->groupID =  originData[origKey]->groupID = globalGroupCount;
-						originData[origKey]->verifyString = hitKey;
-						originData[hitKey]->verifyString = origKey;
-					} else {
-						if(originData[hitKey]->groupID == 0 )
-						{	
-							originData[hitKey]->groupID = originData[origKey]->groupID ;
+					else{
+						if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
+							/*move the node list, from the current elements of vector to the hit element*/
+							moveIdVecElement(originData[hitKey]->groupID, origIt.second->groupID);	
+							groupIdVec[origIt.second->groupID] = {};
+							movedIdVec.push_back(originData[hitKey]->groupID);
+						} else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){ 
+							if(movedIdVec.size() > 0){
+								currentGroupId = movedIdVec.pop_back();
+							} else {
+								globalGroupCount += 1;
+								currentGroupId = globalGroupCount;
+							}
+							originData[hitKey]->groupID =  originData[origKey]->groupID = currentGroupId;
+							if(currentGroupId == globalGroupCount){
+								groupIdVec.push_back({});
+							}
+							groupIdVec[globalGroupCount].push_back(originData[originData]);
+							groupIdVec[globalGroupCount].push_back(originData[hitKey]);
+							originData[origKey]->verifyString = hitKey;
 							originData[hitKey]->verifyString = origKey;
 						} else {
-							originData[origKey]->groupID = originData[hitKey]->groupID;
-							originData[origKey]->verifyString = hitKey;
+							if(originData[hitKey]->groupID == 0 )
+							{	
+								originData[hitKey]->groupID = originData[origKey]->groupID ;
+								originData[hitKey]->verifyString = origKey;
+								groupIdVec[originData[origKey]->groupID].push_back(originData[hitKey]);
+
+							} else {
+								originData[origKey]->groupID = originData[hitKey]->groupID;
+								originData[origKey]->verifyString = hitKey;
+							}
 						}
 					}
 				} 
@@ -197,21 +234,25 @@ void aggregatedData::arrangeGroupId(){
 				if(oneCharDiff(firstHalfKey, hitString) == true){
 					string hitKey = hitString;	
 					hitKey.append(secondHalfKey);
-					if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
+					if(hitKey > origKey)
 						continue;
-					}else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
-						globalGroupCount += 1;
-						originData[hitKey]->groupID = originData[origKey]->groupID = globalGroupCount;
-						originData[origKey]->verifyString = hitKey;
-						originData[hitKey]->verifyString = origKey;
-					} else {
-						if(originData[hitKey]->groupID == 0 )
-						{	   
-							originData[hitKey]->groupID = originData[origKey]->groupID;
+					else{
+						if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
+							continue;
+						}else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
+							globalGroupCount += 1;
+							originData[hitKey]->groupID = originData[origKey]->groupID = globalGroupCount;
+							originData[origKey]->verifyString = hitKey;
 							originData[hitKey]->verifyString = origKey;
 						} else {
-							originData[origKey]->groupID = originData[hitKey]->groupID;
-							originData[origKey]->verifyString = hitKey;
+							if(originData[hitKey]->groupID == 0 )
+							{	   
+								originData[hitKey]->groupID = originData[origKey]->groupID;
+								originData[hitKey]->verifyString = origKey;
+							} else {
+								originData[origKey]->groupID = originData[hitKey]->groupID;
+								originData[origKey]->verifyString = hitKey;
+							}
 						}
 					}
 				} 
@@ -284,7 +325,6 @@ bool aggregatedData::oneCharDiff(string& s1, string& s2){
 	return false;
 }
 void aggregatedData::writeResult(string outFileName){
-	vector<list<node*>> groupIdVec;
 	vector<list<node*>> groupIdVec_2;
 	vector<mapS> mapSVec;
 	vector<unsigned int> mapIntVec;
