@@ -133,7 +133,7 @@ void aggregatedData::sortedInsert(list<node*>& listToUpdate, node* inputNode){
 }
 
 void aggregatedData::moveIdVecElement(unsigned int id1, unsigned int id2){
-	
+	//Move the element	
 	if(groupIdVec[id1].size() == 0 || groupIdVec[id2].size() == 0){
 		cout<<"error at list insert"<<endl;
 		exit(0);
@@ -142,7 +142,7 @@ void aggregatedData::moveIdVecElement(unsigned int id1, unsigned int id2){
 		it->groupID = groupIdVec[id1].front()->groupID;
 	}
 	groupIdVec[id1].merge(groupIdVec[id2], nodeGreater);
-	groupIdV
+	groupIdVec[id2].clear() ;
 }
 
 vector<string> aggregatedData::splitHalf(const string &input){
@@ -196,11 +196,53 @@ void aggregatedData::arrangeGroupId(){
 						if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
 							/*move the node list, from the current elements of vector to the hit element*/
 							moveIdVecElement(originData[hitKey]->groupID, origIt.second->groupID);	
-							groupIdVec[origIt.second->groupID] = {};
-							movedIdVec.push_back(originData[hitKey]->groupID);
+							freeIdVec.push_back(originData[hitKey]->groupID);
 						} else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){ 
-							if(movedIdVec.size() > 0){
-								currentGroupId = movedIdVec.pop_back();
+							if(freeIdVec.size() > 0){
+								currentGroupId = freeIdVec.pop_back();
+							} else {
+								globalGroupCount += 1;
+								currentGroupId = globalGroupCount;
+							}
+							originData[hitKey]->groupID =  originData[origKey]->groupID = currentGroupId;
+							if(currentGroupId == globalGroupCount){
+								groupIdVec.push_back({});
+							}
+							sortedInsert(groupIdVec[globalGroupCount], originData[originData]);
+							groupIdVec[globalGroupCount].push_back(originData[hitKey]);
+							originData[origKey]->verifyString = hitKey;
+							originData[hitKey]->verifyString = origKey;
+						} else {
+							if(originData[hitKey]->groupID == 0 )
+							{	
+								originData[hitKey]->groupID = originData[origKey]->groupID ;
+								originData[hitKey]->verifyString = origKey;
+								groupIdVec[originData[origKey]->groupID].push_back(originData[hitKey]);
+
+							} else {
+								originData[origKey]->groupID = originData[hitKey]->groupID;
+								originData[origKey]->verifyString = hitKey;
+								groupIdVec[originData[hitKey]->groupID].push_back(originData[origKey]);
+							}
+						}
+					}
+				} 
+			}		
+		}
+		if(it2 != secondHalfMap.end()){
+			for(auto &hitString : it2->second->data){
+				if(oneCharDiff(firstHalfKey, hitString) == true){
+					string hitKey = hitString;	
+					hitKey.append(secondHalfKey);
+					if(hitKey > origKey){
+						continue;
+					} else {
+						if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
+							moveIdVecElement(originData[hitKey]->groupID, origIt.second->groupID);	
+							freeIdVec.push_back(originData[hitKey]->groupID);
+						}else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
+							if(freeIdVec.size() > 0){
+								currentGroupId = freeIdVec.pop_back();
 							} else {
 								globalGroupCount += 1;
 								currentGroupId = globalGroupCount;
@@ -215,43 +257,14 @@ void aggregatedData::arrangeGroupId(){
 							originData[hitKey]->verifyString = origKey;
 						} else {
 							if(originData[hitKey]->groupID == 0 )
-							{	
-								originData[hitKey]->groupID = originData[origKey]->groupID ;
-								originData[hitKey]->verifyString = origKey;
-								groupIdVec[originData[origKey]->groupID].push_back(originData[hitKey]);
-
-							} else {
-								originData[origKey]->groupID = originData[hitKey]->groupID;
-								originData[origKey]->verifyString = hitKey;
-							}
-						}
-					}
-				} 
-			}		
-		}
-		if(it2 != secondHalfMap.end()){
-			for(auto &hitString : it2->second->data){
-				if(oneCharDiff(firstHalfKey, hitString) == true){
-					string hitKey = hitString;	
-					hitKey.append(secondHalfKey);
-					if(hitKey > origKey)
-						continue;
-					else{
-						if(origIt.second->groupID != 0 && originData[hitKey]->groupID != 0){
-							continue;
-						}else if(origIt.second->groupID == 0 && originData[hitKey]->groupID == 0){
-							globalGroupCount += 1;
-							originData[hitKey]->groupID = originData[origKey]->groupID = globalGroupCount;
-							originData[origKey]->verifyString = hitKey;
-							originData[hitKey]->verifyString = origKey;
-						} else {
-							if(originData[hitKey]->groupID == 0 )
 							{	   
 								originData[hitKey]->groupID = originData[origKey]->groupID;
 								originData[hitKey]->verifyString = origKey;
+								groupIdVec[originData[origKey]->groupID].push_back(originData[hitKey]);
 							} else {
 								originData[origKey]->groupID = originData[hitKey]->groupID;
 								originData[origKey]->verifyString = hitKey;
+								groupIdVec[originData[hitKey]->groupID].push_back(originData[origKey]);
 							}
 						}
 					}
