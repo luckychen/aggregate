@@ -286,7 +286,20 @@ bool aggregatedData::oneCharDiff(string& s1, string& s2){
 
 	return false;
 }
+
+void aggregatedData::srinkGroupId(vector<list<node*>>& idVec ){
+	unsigned int idSize = 0;	
+	for(auto &i : idVec){
+		if(i.size == 0){
+			i = idVec.back();
+			idVec.pop_back();
+		}
+		
+	}
+}
+
 void aggregatedData::writeResult(string outFileName){
+	srinkGroupId(groupIdVec);
 	vector<list<node*>> groupIdVec_2;
 	vector<mapS> mapSVec;
 	vector<unsigned int> mapIntVec;
@@ -295,7 +308,6 @@ void aggregatedData::writeResult(string outFileName){
 	groupIdVec_2.resize(globalGroupCount+1);
 	
 	for(unsigned int i = 0; i <= globalGroupCount; ++i){
-		groupIdVec.push_back({});
 		mapSVec[i].groupID = i;
 	}	
 	ofstream ofs(outFileName, ofstream::out);
