@@ -68,7 +68,7 @@ class aggregatedData{
 		vector<string> splitHalf(const string &input);
 		vector<list<node*>> groupIdVec;
 		vector<unsigned int> freeIdVec;
-		void srinkGroupId();
+		unsigned int srinkGroupId();
 		void updateGroup(string origKey, string hitKey);
 		void moveIdVecElement(unsigned int id1, unsigned int id2);
 		void buildHalfMap();
@@ -220,6 +220,7 @@ void aggregatedData::updateGroup(string origKey, string hitKey){
 void aggregatedData::arrangeGroupId(){
 
 	vector<string> dividedString;
+	unsigned int elementId = 0;
 	for(auto &origIt : originData){
 		dividedString = splitHalf(origIt.first);
 		auto firstHalfKey = dividedString[0];
@@ -274,6 +275,9 @@ void aggregatedData::arrangeGroupId(){
 				updateGroup(origKey, tempKey);
 			}
 		}
+		elementId++;
+		if(elementId%10000 == 0)
+			cout<<"finished "<<elementId<<endl;
 	}
 }
 
