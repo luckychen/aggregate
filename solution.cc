@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <vector>
 #include <list>
 #include <unistd.h>
 using namespace std;
@@ -18,7 +19,7 @@ typedef struct _node{
 }node;
 
 inline bool nodeGreater (node* node1, node* node2)
-{ return ( node1->readCount>=node2->readCount )};
+{ return ( node1->readCount>=node2->readCount );}
 
 typedef struct _mapS{
 	unsigned int groupID;
@@ -67,6 +68,9 @@ class aggregatedData{
 		vector<string> splitHalf(const string &input);
 		vector<list<node*>> groupIdVec;
 		vector<unsigned int> freeIdVec;
+		void srinkGroupId();
+		void updateGroup(string origKey, string hitKey);
+		void moveIdVecElement(unsigned int id1, unsigned int id2);
 		void buildHalfMap();
 		bool oneCharDiff(string &S1, string &S2);
 	public:
@@ -78,6 +82,7 @@ class aggregatedData{
 			//read the file and put every unique seq into a map
 			sampleRead.open(fileName);
 			getline(sampleRead, inputFileHead);//head line
+
 			while(getline(sampleRead, line)){
 				dataLine++;
 				auto seq = extractSeq(line);		
@@ -97,7 +102,7 @@ class aggregatedData{
 					originData[seq] = temp;	
 				}
 			}		
-			
+			groupIdVec.push_back({});
 			buildHalfMap();
 		}
 		void writeResult(string file);
@@ -175,14 +180,18 @@ void aggregatedData::buildHalfMap(){
 	}
 }
 
-void aggregatedData:updateGroup(string origKey, string hitKey){
-
-	if(originData[origKey]->groupID != 0 && originData[hitKey]->groupID != 0){
-		moveIdVecElement(originData[hitKey]->groupID, originData[origKey]->groupID);	
-		freeIdVec.push_back(originData[hitKey]->groupID);
-	}else if(originData[origKey]->groupID == 0 && originData[hitKey]->groupID == 0){
+void aggregatedData::updateGroup(string origKey, string hitKey){
+	unsigned int currentGroupId;
+	unsigned origId, hitId;
+	origId = originData[origKey]->groupID;
+	hitId = originData[hitKey]->groupID;
+	if(origId != 0 && hitId != 0 && origId != hitId){
+		moveIdVecElement(hitId, origId);	
+		freeIdVec.push_back(origId);
+	}else if(origId == 0 && hitId == 0){
 		if(freeIdVec.size() > 0){
-			currentGroupId = freeIdVec.pop_back();
+			currentGroupId = freeIdVec.back();
+			freeIdVec.pop_back();
 		} else {
 			globalGroupCount += 1;
 			currentGroupId = globalGroupCount;
@@ -191,20 +200,20 @@ void aggregatedData:updateGroup(string origKey, string hitKey){
 		if(currentGroupId == globalGroupCount){
 			groupIdVec.push_back({});
 		}
-		groupIdVec[globalGroupCount].push_back(originData[origKey]);
-		sortedInsert(groupIdVec[globalGroupCount], originData[hitKey]);
+		groupIdVec[currentGroupId].push_back(originData[origKey]);
+		sortedInsert(groupIdVec[currentGroupId], originData[hitKey]);
 		originData[origKey]->verifyString = hitKey;
 		originData[hitKey]->verifyString = origKey;
 	} else {
-		if(originData[hitKey]->groupID == 0 )
+		if(hitId == 0 )
 		{	   
 			originData[hitKey]->groupID = originData[origKey]->groupID;
 			originData[hitKey]->verifyString = origKey;
-			sortedInsert(originData[origKey]->groupID], originData[hitKey]);
+			sortedInsert(groupIdVec[originData[origKey]->groupID], originData[hitKey]);
 		} else {
 			originData[origKey]->groupID = originData[hitKey]->groupID;
 			originData[origKey]->verifyString = hitKey;
-			sortedInsert(originData[hitKey]->groupID], originData[origKey]);
+			sortedInsert(groupIdVec[originData[hitKey]->groupID], originData[origKey]);
 		}
 	}
 }
@@ -224,7 +233,7 @@ void aggregatedData::arrangeGroupId(){
 				if(oneCharDiff(secondHalfKey, hitString) == true){
 					string hitKey = firstHalfKey;	
 					hitKey.append(hitString);
-					if(hitKey > origKey)
+					if(hitKey >= origKey)
 						continue;
 					else{
 						updateGroup(origKey, hitKey);
@@ -237,7 +246,7 @@ void aggregatedData::arrangeGroupId(){
 				if(oneCharDiff(firstHalfKey, hitString) == true){
 					string hitKey = hitString;	
 					hitKey.append(secondHalfKey);
-					if(hitKey > origKey){
+					if(hitKey >= origKey){
 						continue;
 					} else {
 						updateGroup(origKey, hitKey);
@@ -249,7 +258,7 @@ void aggregatedData::arrangeGroupId(){
 		auto tempKey = origKey.substr(1, origKey.size()); 
 		auto it3 = originData.find(tempKey);
 		if(it3 != originData.end()){
-			if(tempKey > origKey)
+			if(tempKey >= origKey)
 				continue;
 			else {
 				updateGroup(origKey, tempKey);
@@ -259,7 +268,7 @@ void aggregatedData::arrangeGroupId(){
 		tempKey = origKey.substr(0, origKey.size() - 1);
 		auto it4 = originData.find(tempKey);
 		if(it4 != originData.end()){
-			if(tempKey > origKey)
+			if(tempKey >= origKey)
 				continue;
 			else {
 				updateGroup(origKey, tempKey);
@@ -287,27 +296,51 @@ bool aggregatedData::oneCharDiff(string& s1, string& s2){
 	return false;
 }
 
-void aggregatedData::srinkGroupId(vector<list<node*>>& idVec ){
-	unsigned int idSize = 0;	
-	for(auto &i : idVec){
-		if(i.size == 0){
-			i = idVec.back();
-			idVec.pop_back();
+unsigned int aggregatedData::srinkGroupId(){
+	unsigned int lo = 0;//location in the vector	
+	bool end = false;
+	//vector<list<node*>>::iterator it;
+	for(auto &it : groupIdVec){
+		if(it.size() == 0 && lo > 0){
+			while((groupIdVec.back()).size() == 0){
+				//find the no-empty elements from end of list
+				if(groupIdVec.back() == it){
+					//this branch means 
+					//last iterator is the last no-empty iterator
+					end = true;
+					break;
+				} else {
+					groupIdVec.pop_back();	
+				}
+			}
+			if(!end){
+				groupIdVec[lo] = groupIdVec.back();
+				for(auto &it2 : groupIdVec[lo]){
+					it2->groupID = lo;
+				}
+				groupIdVec.pop_back();
+			} else{
+				//current iterator is back() and it is also a emplty list
+				//lets pop current iterator and return
+				groupIdVec.pop_back();
+				return lo;
+			}
 		}
-		
+		lo += 1;
 	}
+	return lo;
 }
 
 void aggregatedData::writeResult(string outFileName){
-	srinkGroupId(groupIdVec);
+	unsigned int realGroupCount = srinkGroupId();
 	vector<list<node*>> groupIdVec_2;
 	vector<mapS> mapSVec;
 	vector<unsigned int> mapIntVec;
-	mapSVec.resize(globalGroupCount+1);
-	mapIntVec.resize(globalGroupCount+1);
-	groupIdVec_2.resize(globalGroupCount+1);
+	mapSVec.resize(realGroupCount+1);
+	mapIntVec.resize(realGroupCount+1);
+	groupIdVec_2.resize(realGroupCount+1);
 	
-	for(unsigned int i = 0; i <= globalGroupCount; ++i){
+	for(unsigned int i = 0; i <= realGroupCount; ++i){
 		mapSVec[i].groupID = i;
 	}	
 	ofstream ofs(outFileName, ofstream::out);
@@ -323,10 +356,10 @@ void aggregatedData::writeResult(string outFileName){
 	}
 	sort(mapSVec.begin(), mapSVec.end(), greater<mapS>());
 
-	for(unsigned int i = 0; i <= globalGroupCount; ++i){
+	for(unsigned int i = 0; i <= realGroupCount; ++i){
 		mapIntVec[mapSVec[i].groupID] = i;
 	}
-	for(unsigned int id = 1; id <= globalGroupCount; ++id){
+	for(unsigned int id = 1; id <= realGroupCount; ++id){
 		groupIdVec_2[mapIntVec[id]] = groupIdVec[id];
 	}
 	
@@ -341,7 +374,7 @@ void aggregatedData::writeResult(string outFileName){
 			}
 		}
 	}
-	unsigned int appendId = globalGroupCount;
+	unsigned int appendId = realGroupCount;
 	for(auto &it : groupIdVec[0]){
 		ofs<<to_string(appendId + 1) + '\t' + it->data.front() << endl;	
 		appendId += 1;
