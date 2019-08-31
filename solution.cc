@@ -16,6 +16,7 @@ typedef struct _node{
 	list<string> data;
 	unsigned int readCount;
 	string verifyString;
+	string barCode;
 }node;
 
 inline bool nodeGreater (node* node1, node* node2)
@@ -97,6 +98,7 @@ class aggregatedData{
 				} else {
 					auto temp = new node;
 					temp->groupID = 0;
+					temp->barCode = seq;
 					temp->data.push_back(line);
 					temp->readCount = atoi(extractCount(line).c_str());
 					originData[seq] = temp;	
@@ -147,7 +149,8 @@ void aggregatedData::moveIdVecElement(unsigned int id1, unsigned int id2){
 	for(auto it : groupIdVec[id2]){
 		it->groupID = groupIdVec[id1].front()->groupID;
 	}
-	groupIdVec[id1].merge(groupIdVec[id2], nodeGreater);
+
+	groupIdVec[id1].insert(groupIdVec[id1].end(), groupIdVec[id2].begin(), groupIdVec[id2].end());
 	groupIdVec[id2].clear() ;
 }
 
@@ -185,35 +188,44 @@ void aggregatedData::updateGroup(string origKey, string hitKey){
 	unsigned origId, hitId;
 	origId = originData[origKey]->groupID;
 	hitId = originData[hitKey]->groupID;
-	if(origId != 0 && hitId != 0 && origId != hitId){
-		moveIdVecElement(hitId, origId);	
-		freeIdVec.push_back(origId);
+	if(origId != 0 && hitId != 0  ){
+		if(origId != hitId){
+			moveIdVecElement(hitId, origId);	
+			if(origId == groupIdVec.size()-1){
+				groupIdVec.pop_back();
+			} else {
+				freeIdVec.push_back(origId);
+			}
+		}
 	}else if(origId == 0 && hitId == 0){
 		if(freeIdVec.size() > 0){
 			currentGroupId = freeIdVec.back();
 			freeIdVec.pop_back();
 		} else {
-			globalGroupCount += 1;
-			currentGroupId = globalGroupCount;
+			currentGroupId = groupIdVec.size();//new group
 		}
 		originData[hitKey]->groupID =  originData[origKey]->groupID = currentGroupId;
-		if(currentGroupId == globalGroupCount){
+		if(currentGroupId == groupIdVec.size()){
 			groupIdVec.push_back({});
 		}
 		groupIdVec[currentGroupId].push_back(originData[origKey]);
-		sortedInsert(groupIdVec[currentGroupId], originData[hitKey]);
+		groupIdVec[currentGroupId].push_back(originData[hitKey]);
+		//sortedInsert(groupIdVec[currentGroupId], originData[hitKey]);
 		originData[origKey]->verifyString = hitKey;
 		originData[hitKey]->verifyString = origKey;
 	} else {
+		
 		if(hitId == 0 )
 		{	   
 			originData[hitKey]->groupID = originData[origKey]->groupID;
 			originData[hitKey]->verifyString = origKey;
-			sortedInsert(groupIdVec[originData[origKey]->groupID], originData[hitKey]);
+			groupIdVec[originData[origKey]->groupID].push_back(originData[hitKey]);
+			//sortedInsert(groupIdVec[originData[origKey]->groupID], originData[hitKey]);
 		} else {
 			originData[origKey]->groupID = originData[hitKey]->groupID;
+			groupIdVec[originData[hitKey]->groupID].push_back(originData[origKey]);
 			originData[origKey]->verifyString = hitKey;
-			sortedInsert(groupIdVec[originData[hitKey]->groupID], originData[origKey]);
+			//sortedInsert(groupIdVec[originData[hitKey]->groupID], originData[origKey]);
 		}
 	}
 }
@@ -234,9 +246,8 @@ void aggregatedData::arrangeGroupId(){
 				if(oneCharDiff(secondHalfKey, hitString) == true){
 					string hitKey = firstHalfKey;	
 					hitKey.append(hitString);
-					if(hitKey >= origKey)
-						continue;
-					else{
+					if(hitKey < origKey)
+					{
 						updateGroup(origKey, hitKey);
 					}
 				} 
@@ -247,9 +258,8 @@ void aggregatedData::arrangeGroupId(){
 				if(oneCharDiff(firstHalfKey, hitString) == true){
 					string hitKey = hitString;	
 					hitKey.append(secondHalfKey);
-					if(hitKey >= origKey){
-						continue;
-					} else {
+					if(hitKey < origKey)
+					{
 						updateGroup(origKey, hitKey);
 						
 					}
@@ -259,9 +269,8 @@ void aggregatedData::arrangeGroupId(){
 		auto tempKey = origKey.substr(1, origKey.size()); 
 		auto it3 = originData.find(tempKey);
 		if(it3 != originData.end()){
-			if(tempKey >= origKey)
-				continue;
-			else {
+			if(tempKey < origKey)
+			{
 				updateGroup(origKey, tempKey);
 			}
 		}
@@ -269,15 +278,11 @@ void aggregatedData::arrangeGroupId(){
 		tempKey = origKey.substr(0, origKey.size() - 1);
 		auto it4 = originData.find(tempKey);
 		if(it4 != originData.end()){
-			if(tempKey >= origKey)
-				continue;
-			else {
+			if(tempKey < origKey)
+			{
 				updateGroup(origKey, tempKey);
 			}
 		}
-		elementId++;
-		if(elementId%10000 == 0)
-			cout<<"finished "<<elementId<<endl;
 	}
 }
 
@@ -308,7 +313,7 @@ unsigned int aggregatedData::srinkGroupId(){
 		if(it.size() == 0 && lo > 0){
 			while((groupIdVec.back()).size() == 0){
 				//find the no-empty elements from end of list
-				if(groupIdVec.back() == it){
+				if(groupIdVec.size() == lo+1){
 					//this branch means 
 					//last iterator is the last no-empty iterator
 					end = true;
@@ -337,13 +342,20 @@ unsigned int aggregatedData::srinkGroupId(){
 
 void aggregatedData::writeResult(string outFileName){
 	unsigned int realGroupCount = srinkGroupId();
+	for(auto &it : groupIdVec){
+		it.sort(nodeGreater);		
+	}
 	vector<list<node*>> groupIdVec_2;
 	vector<mapS> mapSVec;
 	vector<unsigned int> mapIntVec;
 	mapSVec.resize(realGroupCount+1);
 	mapIntVec.resize(realGroupCount+1);
 	groupIdVec_2.resize(realGroupCount+1);
-	
+	unsigned int groupedNum = 0;
+	unsigned int unGroupedNum = 0;
+	for(auto &it : groupIdVec){
+		groupedNum += it.size();
+	}
 	for(unsigned int i = 0; i <= realGroupCount; ++i){
 		mapSVec[i].groupID = i;
 	}	
@@ -352,11 +364,10 @@ void aggregatedData::writeResult(string outFileName){
 		if(it.second->groupID != 0){
 			mapSVec[(it.second)->groupID].readCount += (it.second)->readCount;
 			//groupIdVec[(it.second)->groupID].push_back(it.second);
-			sortedInsert(groupIdVec[(it.second)->groupID], it.second);
 		} else {
 			groupIdVec[0].push_back(it.second);	
+			unGroupedNum += 1;
 		}
-		
 	}
 	sort(mapSVec.begin(), mapSVec.end(), greater<mapS>());
 
@@ -368,7 +379,7 @@ void aggregatedData::writeResult(string outFileName){
 	}
 	
 	ofs << "groupID\t" + inputFileHead << endl;
-	for(unsigned int i = 0; i < groupIdVec.size(); ++i){
+	for(unsigned int i = 0; i < realGroupCount; ++i){
 		for(auto &it : groupIdVec_2[i]){
 			for(auto &it_j : it->data){
 				if(V)
