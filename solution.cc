@@ -309,8 +309,11 @@ unsigned int aggregatedData::srinkGroupId(){
 	unsigned int lo = 0;//location in the vector	
 	bool end = false;
 	//vector<list<node*>>::iterator it;
-	for(auto &it : groupIdVec){
-		if(it.size() == 0 && lo > 0){
+	unsigned int origVecSize = groupIdVec.size();
+	for(lo = 0; lo < origVecSize; ++lo){
+		if(lo == groupIdVec.size() - 1)
+			return lo;
+		if(groupIdVec[lo].size() == 0 && lo > 0){
 			while((groupIdVec.back()).size() == 0){
 				//find the no-empty elements from end of list
 				if(groupIdVec.size() == lo+1){
@@ -335,13 +338,12 @@ unsigned int aggregatedData::srinkGroupId(){
 				return lo;
 			}
 		}
-		lo += 1;
 	}
-	return lo;
 }
 
 void aggregatedData::writeResult(string outFileName){
-	unsigned int realGroupCount = srinkGroupId();
+	unsigned int realGroupCount = 0;
+	realGroupCount = srinkGroupId();
 	for(auto &it : groupIdVec){
 		it.sort(nodeGreater);		
 	}
@@ -375,6 +377,7 @@ void aggregatedData::writeResult(string outFileName){
 		mapIntVec[mapSVec[i].groupID] = i;
 	}
 	for(unsigned int id = 1; id <= realGroupCount; ++id){
+		cout<<id<<endl;
 		groupIdVec_2[mapIntVec[id]] = groupIdVec[id];
 	}
 	
